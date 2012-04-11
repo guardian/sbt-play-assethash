@@ -18,5 +18,6 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.7.3")
 
 addSbtPlugin("play" % "sbt-plugin" % "2.0")
 
+addSbtPlugin("com.typesafe.sbtscalariform" % "sbtscalariform" % "0.3.1")
 
 

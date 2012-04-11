@@ -7,6 +7,7 @@ import com.google.common.io._
 import sbtassembly.Plugin._
 import AssemblyKeys._
 import PlayProject._
+import com.typesafe.sbtscalariform.ScalariformPlugin
 
 
 object Frontend extends Plugin
@@ -15,7 +16,7 @@ object Frontend extends Plugin
   val CoffeeFile = """(.*)\.coffee$""".r
   val JavaScriptFile = """(.*)\.js$""".r
 
-  lazy val frontendSettings = assemblySettings ++ Seq(
+  lazy val frontendSettings = ScalariformPlugin.settings ++ assemblySettings ++ Seq(
     sourceGenerators in Compile <+= staticFileRoutes,
     mainClass in assembly := Some("play.core.server.NettyServer"),
     test in assembly := {},
