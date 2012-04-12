@@ -14,7 +14,15 @@ object Frontend extends Plugin {
   val CoffeeFile = """(.*)\.coffee$""".r
   val JavaScriptFile = """(.*)\.js$""".r
 
-  lazy val frontendSettings = ScalariformPlugin.settings ++ assemblySettings ++ Seq(
+  lazy val commonCompileSettings = ScalariformPlugin.settings ++ Seq(
+    organization := "com.gu",
+    scalaVersion := "2.9.1",
+    maxErrors := 20,
+    javacOptions ++= Seq("-source", "1.6", "-target", "1.6", "-encoding", "utf8"),
+    scalacOptions ++= Seq("-unchecked", "-optimise", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
+  )
+
+  lazy val frontendSettings = commonCompileSettings ++ assemblySettings ++ Seq(
     sourceGenerators in Compile <+= staticFileRoutes,
     mainClass in assembly := Some("play.core.server.NettyServer"),
     test in assembly := {},
