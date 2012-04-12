@@ -2,7 +2,7 @@ name := "sbt-frontend-build"
 
 organization := "com.gu"
 
-version := "1.1-SNAPSHOT"
+version := "1.3-SNAPSHOT"
 
 sbtPlugin := true
 
