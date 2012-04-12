@@ -9,9 +9,7 @@ import AssemblyKeys._
 import PlayProject._
 import com.typesafe.sbtscalariform.ScalariformPlugin
 
-
-object Frontend extends Plugin
-{
+object Frontend extends Plugin {
   val LessFile = """(.*)\.less$""".r
   val CoffeeFile = """(.*)\.coffee$""".r
   val JavaScriptFile = """(.*)\.js$""".r
@@ -25,7 +23,8 @@ object Frontend extends Plugin
 
   private def digestFor(file: File): String = Hash.toHex(Files.getDigest(file, MessageDigest.getInstance("MD5")))
 
-  private def staticFileRoutes = (baseDirectory , streams, sourceManaged).map { (base, s, sourceDir) => {
+  private def staticFileRoutes = (baseDirectory, streams, sourceManaged).map { (base, s, sourceDir) =>
+    {
       val staticMap = hashFiles(base).map {
         case (raw, cached) => """ "%s" -> "%s" """ format (raw, cached)
       } mkString (",")
@@ -34,35 +33,27 @@ object Frontend extends Plugin
             package controllers
 
             object Static {
-
               lazy val staticMappings = Map[String,  String](
                 %s
               )
               lazy val reverseMappings = staticMappings.map{ _.swap }
 
               def at(path: String, file: String) = Assets.at(path, reverseMappings(file))
-
               def at(path: String) = "/assets/" + staticMappings(path)
-
             }
           """ format (staticMap)
-
 
       val file = sourceDir / "controllers" / "Static.scala"
 
       IO.write(file, template)
 
       Seq(file)
-
     }
   }
 
-  def hashFiles(base: File): Seq[(String,String)] = {
-
+  def hashFiles(base: File): Seq[(String, String)] = {
     val assetsDir = (base / "app" / "assets")
-
     val resourceFiles = (assetsDir ** "*").get.filter(!_.isDirectory)
-
     val hashedResourceFiles = resourceFiles.flatMap(f => f.relativeTo(assetsDir).map((digestFor(f), _)))
 
     val generatedPaths = hashedResourceFiles flatMap {
@@ -95,48 +86,49 @@ object Frontend extends Plugin
 
   def buildDeployArtifact =
     (assembly, streams, baseDirectory, target, resourceManaged in Compile, name) map {
-      (jar, s, baseDir, outDir, resourcesDir, projectName) => {
-        val log = s.log
+      (jar, s, baseDir, outDir, resourcesDir, projectName) =>
+        {
+          val log = s.log
 
-        val distFile = outDir / "artifacts.zip"
-        log.info("Disting %s ..." format distFile)
+          val distFile = outDir / "artifacts.zip"
+          log.info("Disting %s ..." format distFile)
 
-        if (distFile exists) { distFile delete() }
+          if (distFile exists) { distFile delete () }
 
+          val cacheBustedResources = hashFiles(baseDir)
 
-        val cacheBustedResources = hashFiles(baseDir)
+          val resourceAssetsDir = resourcesDir / "public"
+          val resourceAssets = cacheBustedResources map {
+            case (key, cachedKey) =>
+              (resourceAssetsDir / key, cachedKey)
+          } filter { fileExists }
 
-        val resourceAssetsDir = resourcesDir / "public"
-        val resourceAssets = cacheBustedResources map { case (key, cachedKey) =>
-          (resourceAssetsDir / key, cachedKey)
-        } filter { fileExists }
+          val publicAssetsDir = baseDir / "public"
+          val publicAssets = cacheBustedResources map {
+            case (key, cachedKey) =>
+              (publicAssetsDir / key, cachedKey)
+          } filter { fileExists }
 
-        val publicAssetsDir = baseDir / "public"
-        val publicAssets = cacheBustedResources map { case (key, cachedKey) =>
-          (publicAssetsDir / key, cachedKey)
-        } filter { fileExists }
+          val staticFiles = (resourceAssets ++ publicAssets) map {
+            case (file, cachedKey) =>
+              val locationInZip = "packages/%s/static-files/%s".format(projectName, cachedKey)
+              log.verbose("Static file %s -> %s" format (file, locationInZip))
+              (file, locationInZip)
+          }
 
+          val filesToZip = Seq(
+            baseDir / "conf" / "deploy.json" -> "deploy.json",
+            jar -> "packages/%s/%s".format(projectName, jar.getName)
+          ) ++ staticFiles
 
-        val staticFiles = (resourceAssets ++ publicAssets) map { case (file, cachedKey) =>
-          val locationInZip = "packages/%s/static-files/%s".format(projectName, cachedKey)
-          log.verbose("Static file %s -> %s" format (file, locationInZip))
-          (file, locationInZip)
+          IO.zip(filesToZip, distFile)
+
+          // Tells TeamCity to publish the artifact => leave this println in here
+          println("##teamcity[publishArtifacts '%s => .']" format distFile)
+
+          log.info("Done disting.")
+          jar
         }
-
-        val filesToZip = Seq(
-          baseDir / "conf" / "deploy.json" -> "deploy.json",
-          jar -> "packages/%s/%s".format(projectName, jar.getName)
-        ) ++ staticFiles
-
-
-        IO.zip(filesToZip, distFile)
-
-        //tells TeamCity to publish the artifact => leav this println in here
-        println("##teamcity[publishArtifacts '%s => .']" format distFile)
-
-        log.info("Done disting.")
-        jar
-      }
     }
 
   private def fileExists(f: (File, String)) = f._1.exists()
