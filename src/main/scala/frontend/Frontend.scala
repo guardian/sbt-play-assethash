@@ -18,8 +18,8 @@ object Frontend extends Plugin {
     organization := "com.gu",
     scalaVersion := "2.9.1",
     maxErrors := 20,
-    javacOptions ++= Seq("-source", "1.6", "-target", "1.6", "-encoding", "utf8"),
-    scalacOptions ++= Seq("-unchecked", "-optimise", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
+    javacOptions := Seq("-g", "-source", "1.6", "-target", "1.6", "-encoding", "utf8"),
+    scalacOptions := Seq("-unchecked", "-optimise", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
   )
 
   lazy val frontendSettings = commonCompileSettings ++ assemblySettings ++ Seq(
