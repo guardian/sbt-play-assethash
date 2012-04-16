@@ -27,7 +27,7 @@ object Frontend extends Plugin {
     mainClass in assembly := Some("play.core.server.NettyServer"),
     test in assembly := {},
     dist <<= buildDeployArtifact,
-    assembledMappings in assembly <<= (assembledMappings in assembly, classDirectory) map { filterLoggerXml }
+    assembledMappings in assembly <<= (assembledMappings in assembly, classDirectory in Compile) map { filterLoggerXml }
   )
 
   private def digestFor(file: File): String = Hash.toHex(Files.getDigest(file, MessageDigest.getInstance("MD5")))
