@@ -24,7 +24,7 @@ object PluginBuild extends Build {
         "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
       ),
       
-      addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.7.3"),
+      addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.7.4"),
       addSbtPlugin("play" % "sbt-plugin" % "2.0"),
       addSbtPlugin("com.typesafe.sbtscalariform" % "sbtscalariform" % "0.3.1")
     )
