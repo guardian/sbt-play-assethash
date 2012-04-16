@@ -27,7 +27,7 @@ object Frontend extends Plugin {
     mainClass in assembly := Some("play.core.server.NettyServer"),
     test in assembly := {},
     dist <<= buildDeployArtifact,
-    assembledMappings in assembly <<= filterCorrectLoggerXML
+    assembledMappings in assembly <<= (assembledMappings in assembly, classDirectory) map { filterLoggerXml }
   )
 
   private def digestFor(file: File): String = Hash.toHex(Files.getDigest(file, MessageDigest.getInstance("MD5")))
@@ -142,17 +142,12 @@ object Frontend extends Plugin {
 
   private def fileExists(f: (File, String)) = f._1.exists()
 
-  def filterCorrectLoggerXML = assembledMappings in assembly map {
-    original: (File => Seq[(File, String)]) =>
-      ((f: File) =>
-        original(f).filter {
-          case (file, location) if location == "logger.xml" => {
-            //we want the logger.xml in our app, not the one in the play jar file
-            //the simplest way to figure this out is that our one is in the 'target' directory
-            file.toString.contains("/target/scala")
-          }
-          case _ => true
-        }
-        )
+  def filterLoggerXml(original: (File => Seq[(File, String)]), classDir: File) = (base: File) => original(base).filter {
+    case (file, location) if location == "logger.xml" => {
+      //we want the logger.xml in our app, not the one in the play jar file
+      //the simplest way to figure this out is that our one is in the class directory
+      file.getAbsolutePath.contains(classDir.getAbsolutePath)
+    }
+    case _ => true
   }
 }
