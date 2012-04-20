@@ -48,7 +48,7 @@ object Frontend extends Plugin {
               lazy val reverseMappings = staticMappings.map{ _.swap }
 
               def at(path: String, file: String) = Assets.at(path, reverseMappings(file))
-              def at(path: String) = "/assets/" + staticMappings(path)
+              def at(path: String) = conf.Configuration.static.path + staticMappings(path)
             }
           """ format (staticMap)
 
