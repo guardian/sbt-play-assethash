@@ -14,7 +14,7 @@ object Frontend extends Plugin {
   val CoffeeFile = """(.*)\.coffee$""".r
   val JavaScriptFile = """(.*)\.js$""".r
 
-  lazy val commonCompileSettings = ScalariformPlugin.settings ++ Seq(
+  lazy val commonCompileSettings = ScalariformPlugin.scalariformSettings ++ Seq(
     organization := "com.gu",
     scalaVersion := "2.9.1",
     maxErrors := 20,
