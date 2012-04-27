@@ -1,148 +1,97 @@
 package frontend
 
+import com.typesafe.sbtscalariform.ScalariformPlugin
+import java.io.File
 import sbt._
-import Keys._
-import java.security.MessageDigest
-import com.google.common.io._
 import sbtassembly.Plugin._
 import AssemblyKeys._
 import PlayProject._
-import com.typesafe.sbtscalariform.ScalariformPlugin
+import Keys._
 
 object Frontend extends Plugin {
-  val LessFile = """(.*)\.less$""".r
-  val CoffeeFile = """(.*)\.coffee$""".r
-  val JavaScriptFile = """(.*)\.js$""".r
 
-  lazy val commonCompileSettings = ScalariformPlugin.scalariformSettings ++ Seq(
+  lazy val compileSettings = ScalariformPlugin.scalariformSettings ++ Seq(
     organization := "com.gu",
     scalaVersion := "2.9.1",
+
     maxErrors := 20,
     javacOptions := Seq("-g", "-source", "1.6", "-target", "1.6", "-encoding", "utf8"),
-    scalacOptions := Seq("-unchecked", "-optimise", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
+    scalacOptions := Seq("-unchecked", "-optimise", "-deprecation", "-Xcheckinit", "-encoding", "utf8"),
+
+    externalResolvers <<= resolvers map { rs =>
+      Resolver.withDefaultResolvers(rs, scalaTools = false)
+    },
+
+    playCopyAssets <<= copyAssetsWithMD5s
   )
 
-  lazy val frontendSettings = commonCompileSettings ++ assemblySettings ++ Seq(
-    sourceGenerators in Compile <+= staticFileRoutes,
-    mainClass in assembly := Some("play.core.server.NettyServer"),
+  lazy val distSettings = compileSettings ++ assemblySettings ++ Seq(
     test in assembly := {},
+
+    mainClass in assembly := Some("play.core.server.NettyServer"),
     dist <<= buildDeployArtifact,
     assembledMappings in assembly <<= (assembledMappings in assembly, classDirectory in Compile) map {
       filterFiles(List("logger.xml", "version.txt"))
     }
   )
 
-  private def digestFor(file: File): String = Hash.toHex(Files.getDigest(file, MessageDigest.getInstance("MD5")))
+  private def copyAssetsWithMD5s =
+    (streams in Compile, playCopyAssets, classDirectory in Compile) map {
+      (s, current, classDirectory) =>
 
-  private def staticFileRoutes = (baseDirectory, streams, sourceManaged).map { (base, s, sourceDir) =>
-    {
-      val staticMap = hashFiles(base).map {
-        case (raw, cached) => """ "%s" -> "%s" """ format (raw, cached)
-      } mkString (",")
+        val assetFiles = current.unzip._2 filter { _.isUnder(classDirectory / "public") }
+        val assets = Assets.fromFiles(classDirectory / "public", assetFiles)
+        val assetRemappings = assets.toMD5Remap
 
-      val template = """
-            package controllers
+        // Generate assetmap file
+        val assetMapContents = assets.toText
+        val assetMapFile = classDirectory / "assetmaps" / ("asset.%s.map" format assetMapContents.md5Hex)
 
-            object Static {
-              lazy val staticMappings = Map[String,  String](
-                %s
-              )
-              lazy val reverseMappings = staticMappings.map{ _.swap }
+        IO.delete(classDirectory / "assetmaps")
+        IO.write(assetMapFile, assetMapContents)
+        s.log.info("Generated assetmap file at %s:\n%s".format(assetMapFile, assetMapContents).indentContinuationLines)
 
-              def at(path: String, file: String) = Assets.at(path, reverseMappings(file))
-              def at(path: String) = conf.Configuration.static.path + staticMappings(path)
-            }
-          """ format (staticMap)
+        // Rename assets to include md5Hex chunk
+        IO.move(assetRemappings)
+        s.log.info(
+          ("Renamed assets to include md5Hex chunk:\n" + (assetRemappings mkString "\n").sortLines).
+            indentContinuationLines.
+            deleteAll(classDirectory / "public" + "/")
+        )
 
-      val file = sourceDir / "controllers" / "Static.scala"
-
-      IO.write(file, template)
-
-      Seq(file)
-    }
-  }
-
-  def hashFiles(base: File): Seq[(String, String)] = {
-    val assetsDir = (base / "app" / "assets")
-    val resourceFiles = (assetsDir ** "*").get.filter(!_.isDirectory)
-    val hashedResourceFiles = resourceFiles.flatMap(f => f.relativeTo(assetsDir).map((digestFor(f), _)))
-
-    val generatedPaths = hashedResourceFiles flatMap {
-      case (hash, file) =>
-        file.getPath match {
-          case LessFile(name) => List((name + ".css", name + "." + hash + ".css"),
-            (name + ".min.css", name + "." + hash + ".min.css"))
-          case CoffeeFile(name) => List((name + ".js", name + "." + hash + ".js"),
-            (name + ".min.js", name + "." + hash + ".min.js"))
-          case JavaScriptFile(name) => List((name + ".js", name + "." + hash + ".js"),
-            (name + ".min.js", name + "." + hash + ".min.js"))
-          case _ => sys.error("Do not understand resource file: " + name)
-        }
+        // Update current with new names and assetmap file
+        (assetMapFile -> assetMapFile) +: (current.toMap composeWith assetRemappings).toSeq
     }
 
-    val publicDir = (base / "public")
-
-    val publicPaths = (publicDir ** ("**")).get.filter(!_.isDirectory).flatMap {
-      file: File =>
-        val hash = digestFor(file)
-
-        file.relativeTo(publicDir).map(_.getPath).toList.map {
-          path =>
-            val pathParts = path.split("""\.""")
-            (path, (pathParts.dropRight(1) ++ List(hash) ++ pathParts.takeRight(1)).mkString("."))
-        }
-    }
-    (generatedPaths ++ publicPaths)
-  }
-
-  def buildDeployArtifact =
-    (assembly, streams, baseDirectory, target, resourceManaged in Compile, name) map {
-      (jar, s, baseDir, outDir, resourcesDir, projectName) =>
+  private def buildDeployArtifact =
+    (streams, assembly, baseDirectory, target, name, playCopyAssets, classDirectory in Compile) map {
+      (s, assembly, baseDirectory, target, projectName, playCopyAssets, classDirectory) =>
         {
-          val log = s.log
+          val distFile = target / "artifacts.zip"
+          s.log.info("Disting " + distFile)
 
-          val distFile = outDir / "artifacts.zip"
-          log.info("Disting %s ..." format distFile)
+          if (distFile exists) { distFile.delete }
 
-          if (distFile exists) { distFile delete () }
-
-          val cacheBustedResources = hashFiles(baseDir)
-
-          val resourceAssetsDir = resourcesDir / "public"
-          val resourceAssets = cacheBustedResources map {
-            case (key, cachedKey) =>
-              (resourceAssetsDir / key, cachedKey)
-          } filter { fileExists }
-
-          val publicAssetsDir = baseDir / "public"
-          val publicAssets = cacheBustedResources map {
-            case (key, cachedKey) =>
-              (publicAssetsDir / key, cachedKey)
-          } filter { fileExists }
-
-          val staticFiles = (resourceAssets ++ publicAssets) map {
-            case (file, cachedKey) =>
-              val locationInZip = "packages/%s/static-files/%s".format(projectName, cachedKey)
-              log.verbose("Static file %s -> %s" format (file, locationInZip))
-              (file, locationInZip)
+          val publicDirectory = classDirectory / "public"
+          val staticFiles = playCopyAssets.unzip._2 filter { _ isUnder publicDirectory } map { file =>
+            val locationInZip = "packages/%s/static-files/%s".format(projectName, file rebase publicDirectory)
+            (file, locationInZip)
           }
 
-          val filesToZip = Seq(
-            baseDir / "conf" / "deploy.json" -> "deploy.json",
-            jar -> "packages/%s/%s".format(projectName, jar.getName)
+          val assemblyFiles = Seq(
+            baseDirectory / "conf" / "deploy.json" -> "deploy.json",
+            assembly -> "packages/%s/%s".format(projectName, assembly.getName)
           ) ++ staticFiles
 
-          IO.zip(filesToZip, distFile)
+          IO.zip(assemblyFiles, distFile)
 
           // Tells TeamCity to publish the artifact => leave this println in here
           println("##teamcity[publishArtifacts '%s => .']" format distFile)
 
-          log.info("Done disting.")
-          jar
+          s.log.info("Done disting.")
+          assembly
         }
     }
-
-  private def fileExists(f: (File, String)) = f._1.exists()
 
   def filterFiles(filenames: Seq[String])(original: (File => Seq[(File, String)]), classDir: File) = (base: File) => original(base).filter {
     case (file, location) if filenames contains location => {
