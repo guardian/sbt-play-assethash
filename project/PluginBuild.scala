@@ -1,6 +1,5 @@
 import sbt._
 import Keys._
-import Defaults._
 import com.typesafe.sbtscalariform.ScalariformPlugin
 
 object PluginBuild extends Build {
@@ -10,7 +9,7 @@ object PluginBuild extends Build {
   // build definition as plugins usually are.
   
   lazy val main = Project("sbt-frontend-build", file("."))
-    .settings(ScalariformPlugin.settings: _*)
+    .settings(ScalariformPlugin.defaultScalariformSettings: _*)
     .settings(
       name := "sbt-frontend-build",
       organization := "com.gu",
@@ -22,6 +21,15 @@ object PluginBuild extends Build {
       resolvers ++= Seq(
         "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
         "sbt-idea-repo" at "http://mpeltonen.github.com/maven/"
+      ),
+
+      externalResolvers <<= resolvers map { rs =>
+        Resolver.withDefaultResolvers(rs, scalaTools = false)
+      },
+
+      libraryDependencies ++= Seq(
+        "commons-codec" % "commons-codec" % "1.6",
+        "commons-io" % "commons-io" % "2.2"
       ),
       
       addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.7.4"),
