@@ -32,7 +32,7 @@ object PluginBuild extends Build {
         "commons-io" % "commons-io" % "2.2"
       ),
       
-      addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.7.4"),
+      addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.8.0"),
       addSbtPlugin("play" % "sbt-plugin" % "2.0"),
       addSbtPlugin("com.typesafe.sbtscalariform" % "sbtscalariform" % "0.3.1"),
       addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.0.0"),
