@@ -1,9 +1,11 @@
 package frontend
 
 import java.io.{ FileInputStream, File }
+import java.util.Properties
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.IOUtils
 import sbt._
+import scala.collection.JavaConversions._
 
 object `package` {
 
@@ -44,5 +46,19 @@ object `package` {
 
   implicit def map2ComposeWith[K, V](kv: Map[K, V]) = new {
     def composeWith(vv: Map[V, V]): Map[K, V] = kv mapValues { v => vv.getOrElse(v, v) }
+  }
+
+  implicit def properties2ToMap(properties: Properties) = new {
+    def toMap: Map[String, String] = properties.entrySet map { entry =>
+      (entry.getKey.toString, entry.getValue.toString)
+    } toMap
+  }
+
+  implicit def listOfMaps2DuplicateKeys[K, V](maps: List[Map[K, V]]) = new {
+    def duplicateKeys: Set[K] = {
+      val keys = (maps flatMap { _.keySet })
+      val keyInstances = keys groupBy { k => k }
+      (keyInstances filter { case (key, instances) => instances.length > 1 }).keySet
+    }
   }
 }
