@@ -57,9 +57,14 @@ object Frontend extends Plugin {
   private def copyAssetsWithMD5s =
     (streams in Compile, playCopyAssets, classDirectory in Compile) map {
       (s, current, classDirectory) =>
+        implicit val log = s.log
 
         val assetFiles = current.unzip._2 filter { _.isUnder(classDirectory / "public") }
         val assets = Assets.fromFiles(classDirectory / "public", assetFiles)
+
+        // Wait for assets to appear if necessary from asynchronous write. TODO: Revisit this
+        assetFiles.synchronise()
+
         val assetRemappings = assets.toMD5Remap
 
         // Generate assetmap file
@@ -68,11 +73,11 @@ object Frontend extends Plugin {
 
         IO.delete(classDirectory / "assetmaps")
         IO.write(assetMapFile, assetMapContents)
-        s.log.info("Generated assetmap file at %s:\n%s".format(assetMapFile, assetMapContents).indentContinuationLines)
+        log.info("Generated assetmap file at %s:\n%s".format(assetMapFile, assetMapContents).indentContinuationLines)
 
         // Rename assets to include md5Hex chunk
         IO.move(assetRemappings)
-        s.log.info(
+        log.info(
           ("Renamed assets to include md5Hex chunk:\n" + (assetRemappings mkString "\n").sortLines).
             indentContinuationLines.
             deleteAll(classDirectory / "public" + "/")
