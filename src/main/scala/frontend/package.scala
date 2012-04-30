@@ -61,4 +61,23 @@ object `package` {
       (keyInstances filter { case (key, instances) => instances.length > 1 }).keySet
     }
   }
+
+  implicit def seqOfFiles2RichSeqOfFiles(files: Seq[File]) = new RichTraversableOfFiles(files)
+
+  class RichTraversableOfFiles(files: Seq[File]) {
+    def synchronise(attempt: Int = 1)(implicit log: { def info(msg: => String) }) {
+      val missing = files filter { !_.exists() }
+
+      if (!missing.isEmpty) {
+        log.info("Waiting on: " + missing.mkString(", "))
+        if (attempt < 20) {
+          log.info("Retrying synchronisation after 100ms (retry %d)".format(attempt))
+          Thread.sleep(100)
+          missing.synchronise(attempt + 1)
+        } else {
+          log.warn("Aborting wait after 20 retries")
+        }
+      }
+    }
+  }
 }
