@@ -22,7 +22,13 @@ object Frontend extends Plugin {
       Resolver.withDefaultResolvers(rs, scalaTools = false)
     },
 
-    playCopyAssets <<= copyAssetsWithMD5s
+    playCopyAssets <<= copyAssetsWithMD5s,
+
+    ivyXML :=
+      <dependencies>
+          <exclude org="commons-logging"/>       // conflicts with jcl-over-slf4j
+          <exclude org="org.springframework"/>   // because I don't like it
+      </dependencies>
   )
 
   lazy val distSettings = compileSettings ++ assemblySettings ++ Seq(
@@ -30,8 +36,20 @@ object Frontend extends Plugin {
 
     mainClass in assembly := Some("play.core.server.NettyServer"),
     dist <<= buildDeployArtifact,
-    assembledMappings in assembly <<= (assembledMappings in assembly, classDirectory in Compile) map {
-      filterFiles(List("logger.xml", "version.txt"))
+
+    mergeStrategy in assembly <<= (mergeStrategy in assembly) { current =>
+      {
+        // Previous default MergeStrategy was first
+
+        // Take ours, i.e. MergeStrategy.last...
+        case "logger.xml" => MergeStrategy.last
+        case "version.txt" => MergeStrategy.last
+
+        case "overview.html" => MergeStrategy.first
+        case meta if meta.startsWith("META-INF/") => MergeStrategy.first
+
+        case other => current(other)
+      }
     }
   )
 
@@ -92,14 +110,4 @@ object Frontend extends Plugin {
           assembly
         }
     }
-
-  def filterFiles(filenames: Seq[String])(original: (File => Seq[(File, String)]), classDir: File) = (base: File) => original(base).filter {
-    case (file, location) if filenames contains location => {
-      //we want the file in our app, not the one in the play jar file
-      //the simplest way to figure this out is that our one is in the class directory
-      file.getAbsolutePath.contains(classDir.getAbsolutePath)
-    }
-    case _ => true
-  }
-
 }
