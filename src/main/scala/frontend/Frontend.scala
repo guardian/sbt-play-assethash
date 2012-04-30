@@ -1,7 +1,8 @@
 package frontend
 
 import com.typesafe.sbtscalariform.ScalariformPlugin
-import java.io.File
+import java.util.Properties
+import java.io.{ FileInputStream, File }
 import sbt._
 import sbtassembly.Plugin._
 import AssemblyKeys._
@@ -90,12 +91,27 @@ object Frontend extends Plugin {
 
           if (distFile exists) { distFile.delete }
 
-          val publicDirectory = classDirectory / "public"
-          val staticFiles = playCopyAssets.unzip._2 filter { _ isUnder publicDirectory } map { file =>
-            val locationInZip = "packages/%s/static-files/%s".format(projectName, file rebase publicDirectory)
-            (file, locationInZip)
+          val targetDist = target / "dist"
+          if (targetDist exists) { targetDist.delete }
+
+          // Extract and identify assets
+          IO.unzip(assembly, targetDist, new SimpleFilter(name =>
+            name.startsWith("assetmaps") || name.startsWith("public"))
+          )
+
+          val assetMaps = (targetDist / "assetmaps" * "*").get map { loadAssetMap(_) }
+
+          // You try to determine a precedence order here if you like...
+          val keyCollisions = assetMaps.toList.duplicateKeys
+          if (!keyCollisions.isEmpty) {
+            throw new RuntimeException("Assetmap collisions for: " + keyCollisions.mkString(", "))
           }
 
+          val staticFiles = assetMaps flatMap { _.values } map { file =>
+            (targetDist / "public" / file, "packages/%s/static-files/%s".format(projectName, file))
+          }
+
+          // Build artifact
           val assemblyFiles = Seq(
             baseDirectory / "conf" / "deploy.json" -> "deploy.json",
             assembly -> "packages/%s/%s".format(projectName, assembly.getName)
@@ -110,4 +126,10 @@ object Frontend extends Plugin {
           assembly
         }
     }
+
+  private def loadAssetMap(file: File): Map[String, String] = {
+    val properties = new Properties()
+    using(new FileInputStream(file)) { properties.load }
+    properties.toMap
+  }
 }
