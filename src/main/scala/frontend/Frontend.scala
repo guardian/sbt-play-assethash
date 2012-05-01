@@ -23,6 +23,9 @@ object Frontend extends Plugin {
       Resolver.withDefaultResolvers(rs, scalaTools = false)
     },
 
+    resourceGenerators in Compile <+= cssGeneratorTask,
+    resourceGenerators in Compile <+= imageGeneratorTask,
+
     managedResources in Compile <<= managedResourcesWithMD5s,
 
     ivyXML :=
@@ -53,6 +56,28 @@ object Frontend extends Plugin {
       }
     }
   )
+
+  val cssGenerator = TaskKey[Seq[File]]("css-generator", "Copy CSS files to resources-managed")
+  val cssGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
+    (sourceDirectory, resourceManaged) =>
+      val css = (sourceDirectory / "assets") ** "*.css"
+      val copies = css.get map { css => (css, resourceManaged / "public" / css.rebase(sourceDirectory / "assets").toString) }
+
+      IO.copy(copies)
+
+      copies.unzip._2
+  }
+
+  val imageGenerator = TaskKey[Seq[File]]("image-generator", "Copy image files to resources-managed")
+  val imageGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
+    (sourceDirectory, resourceManaged) =>
+      val images = (sourceDirectory / "assets" / "images") ** "*"
+      val copies = images.get map { image => (image, resourceManaged / "public" / image.rebase(sourceDirectory / "assets").toString) }
+
+      IO.copy(copies)
+
+      copies.unzip._2
+  }
 
   private def managedResourcesWithMD5s =
     (streams in Compile, managedResources in Compile, resourceManaged in Compile) map {
@@ -106,7 +131,7 @@ object Frontend extends Plugin {
           // You try to determine a precedence order here if you like...
           val keyCollisions = assetMaps.toList.duplicateKeys
           if (!keyCollisions.isEmpty) {
-            throw new RuntimeException("Assetmap collisions for: " + keyCollisions.mkString(", "))
+            throw new RuntimeException("Assetmap collisions for: " + keyCollisions.toList.sorted.mkString(", "))
           }
 
           val staticFiles = assetMaps flatMap { _.values } map { file =>
