@@ -44,8 +44,8 @@ object `package` {
     def md5Hex = contents.md5Hex
   }
 
-  implicit def map2ComposeWith[K, V](kv: Map[K, V]) = new {
-    def composeWith(vv: Map[V, V]): Map[K, V] = kv mapValues { v => vv.getOrElse(v, v) }
+  implicit def seq2UpdateWith[V](seq: Seq[V]) = new {
+    def updateWith(vv: Map[V, V]): Seq[V] = seq map { v => vv.getOrElse(v, v) }
   }
 
   implicit def properties2ToMap(properties: Properties) = new {
@@ -59,25 +59,6 @@ object `package` {
       val keys = (maps flatMap { _.keySet })
       val keyInstances = keys groupBy { k => k }
       (keyInstances filter { case (key, instances) => instances.length > 1 }).keySet
-    }
-  }
-
-  implicit def seqOfFiles2RichSeqOfFiles(files: Seq[File]) = new RichTraversableOfFiles(files)
-
-  class RichTraversableOfFiles(files: Seq[File]) {
-    def synchronise(attempt: Int = 1)(implicit log: { def warn(msg: => String) }) {
-      val missing = files filter { !_.exists() }
-
-      if (!missing.isEmpty) {
-        log.warn("Waiting on: " + missing.mkString(", "))
-        if (attempt < 20) {
-          log.warn("Retrying synchronisation after 100ms (retry %d)".format(attempt))
-          Thread.sleep(100)
-          missing.synchronise(attempt + 1)
-        } else {
-          log.warn("Aborting wait after 20 retries")
-        }
-      }
     }
   }
 }

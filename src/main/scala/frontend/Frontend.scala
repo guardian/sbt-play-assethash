@@ -23,7 +23,7 @@ object Frontend extends Plugin {
       Resolver.withDefaultResolvers(rs, scalaTools = false)
     },
 
-    playCopyAssets <<= copyAssetsWithMD5s,
+    managedResources in Compile <<= managedResourcesWithMD5s,
 
     ivyXML :=
       <dependencies>
@@ -54,37 +54,34 @@ object Frontend extends Plugin {
     }
   )
 
-  private def copyAssetsWithMD5s =
-    (streams in Compile, playCopyAssets, classDirectory in Compile) map {
-      (s, current, classDirectory) =>
+  private def managedResourcesWithMD5s =
+    (streams in Compile, managedResources in Compile, resourceManaged in Compile) map {
+      (s, current, resourceManaged) =>
         implicit val log = s.log
 
-        val assetFiles = current.unzip._2 filter { _.isUnder(classDirectory / "public") }
-        val assets = Assets.fromFiles(classDirectory / "public", assetFiles)
-
-        // Wait for assets to appear if necessary from asynchronous write. TODO: Revisit this
-        assetFiles.synchronise()
+        val assetFiles = current filter { _.isUnder(resourceManaged / "public") }
+        val assets = Assets.fromFiles(resourceManaged / "public", assetFiles)
 
         val assetRemappings = assets.toMD5Remap
 
         // Generate assetmap file
         val assetMapContents = assets.toText
-        val assetMapFile = classDirectory / "assetmaps" / ("asset.%s.map" format assetMapContents.md5Hex)
+        val assetMapFile = resourceManaged / "assetmaps" / ("asset.%s.map" format assetMapContents.md5Hex)
 
-        IO.delete(classDirectory / "assetmaps")
+        IO.delete(resourceManaged / "assetmaps")
         IO.write(assetMapFile, assetMapContents)
         log.info("Generated assetmap file at %s:\n%s".format(assetMapFile, assetMapContents).indentContinuationLines)
 
-        // Rename assets to include md5Hex chunk
-        IO.move(assetRemappings)
+        // Copy assets to include md5Hex chunk. Moving would break subsequent calls.
+        IO.copy(assetRemappings)
         log.info(
           ("Renamed assets to include md5Hex chunk:\n" + (assetRemappings mkString "\n").sortLines).
             indentContinuationLines.
-            deleteAll(classDirectory / "public" + "/")
+            deleteAll(resourceManaged / "public" + "/")
         )
 
         // Update current with new names and assetmap file
-        (assetMapFile -> assetMapFile) +: (current.toMap composeWith assetRemappings).toSeq
+        assetMapFile +: (current updateWith assetRemappings).toSeq
     }
 
   private def buildDeployArtifact =
