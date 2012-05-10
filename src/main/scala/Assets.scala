@@ -1,16 +1,25 @@
-package frontend
+package com.gu
 
 import java.io.File
 import sbt._
 
 class Assets(private val assets: Seq[Asset]) {
-  def toText: String = (assets map { _.toText }).sorted mkString "\n"
-  def toMD5Remap: Map[File, File] = (assets map { _.toMD5Remap }).toMap
+  def toText: String = (assets map {
+    _.toText
+  }).sorted mkString "\n"
+
+  def toMD5Remap: Map[File, File] = (assets map {
+    _.toMD5Remap
+  }).toMap
 }
 
 object Assets {
   def fromFiles(base: File, files: Seq[File]): Assets = {
-    new Assets(files filter { !_.isDirectory } map { Asset(_, base) })
+    new Assets(files filter {
+      !_.isDirectory
+    } map {
+      Asset(_, base)
+    })
   }
 }
 
@@ -25,5 +34,6 @@ case class Asset(absolute: File, base: File) {
   }
 
   def toText: String = debased + "=" + debasedWithMD5Chunk
+
   def toMD5Remap: (File, File) = (absolute, base / debasedWithMD5Chunk)
 }

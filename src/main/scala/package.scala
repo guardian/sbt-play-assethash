@@ -1,4 +1,4 @@
-package frontend
+package com.gu
 
 import java.io.{ FileInputStream, File }
 import java.util.Properties
