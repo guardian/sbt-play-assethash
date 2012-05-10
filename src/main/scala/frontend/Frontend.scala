@@ -15,10 +15,7 @@ object Frontend extends Plugin {
   val artifactResources = TaskKey[Seq[(File,String)]]("artifact-resources", "Files that will be collected by the deployment-artifact task")
   val artifactFile = SettingKey[String]("artifact-file", "Filename of the artifact built by deployment-artifact")
 
-  lazy val frontendSettings = distSettings ++ assetHashSettings
-  lazy val noHashFrontendSettings = distSettings
-
-  lazy val compileSettings = ScalariformPlugin.scalariformSettings ++ Seq(
+  lazy val compileSettings:Seq[Setting[_]] = ScalariformPlugin.scalariformSettings ++ Seq(
     organization := "com.gu",
     scalaVersion := "2.9.1",
 
@@ -37,7 +34,7 @@ object Frontend extends Plugin {
       </dependencies>
   )
 
-  lazy val distSettings = compileSettings ++ assemblySettings ++ Seq(
+  lazy val distSettings:Seq[Setting[_]] = compileSettings ++ assemblySettings ++ Seq(
     test in assembly := {},
 
     mainClass in assembly := Some("play.core.server.NettyServer"),
@@ -83,10 +80,13 @@ object Frontend extends Plugin {
     }}
   )
 
-  lazy val assetHashSettings = Seq(
+  lazy val assetHashCompileSettings:Seq[Setting[_]] = Seq(
     resourceGenerators in Compile <+= cssGeneratorTask,
     resourceGenerators in Compile <+= imageGeneratorTask,
-    managedResources in Compile <<= managedResourcesWithMD5s,
+    managedResources in Compile <<= managedResourcesWithMD5s
+  )
+
+  lazy val assetHashDistSettings:Seq[Setting[_]] = assetHashCompileSettings ++ Seq(
     artifactResources <++= assetMapResources
   )
 
