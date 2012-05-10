@@ -11,6 +11,13 @@ import Keys._
 
 object Frontend extends Plugin {
 
+  val deploymentArtifact = TaskKey[File]("deployment-artifact", "Builds a deployable zip file for magenta")
+  val artifactResources = TaskKey[Seq[(File,String)]]("artifact-resources", "Files that will be collected by the deployment-artifact task")
+  val artifactFile = SettingKey[String]("artifact-file", "Filename of the artifact built by deployment-artifact")
+
+  lazy val frontendSettings = distSettings ++ assetHashSettings
+  lazy val noHashFrontendSettings = distSettings
+
   lazy val compileSettings = ScalariformPlugin.scalariformSettings ++ Seq(
     organization := "com.gu",
     scalaVersion := "2.9.1",
@@ -23,11 +30,6 @@ object Frontend extends Plugin {
       Resolver.withDefaultResolvers(rs, scalaTools = false)
     },
 
-    resourceGenerators in Compile <+= cssGeneratorTask,
-    resourceGenerators in Compile <+= imageGeneratorTask,
-
-    managedResources in Compile <<= managedResourcesWithMD5s,
-
     ivyXML :=
       <dependencies>
           <exclude org="commons-logging"/>       // conflicts with jcl-over-slf4j
@@ -39,6 +41,17 @@ object Frontend extends Plugin {
     test in assembly := {},
 
     mainClass in assembly := Some("play.core.server.NettyServer"),
+
+    artifactResources <<= (assembly, name, baseDirectory) map { (assembly, name, baseDirectory) =>
+      Seq(
+        (assembly, "packages/%s/%s".format(name, assembly.getName)),
+        (baseDirectory / "conf" / "deploy.json", "deploy.json")
+      )
+    },
+
+    artifactFile := "artifacts.zip",
+
+    deploymentArtifact <<= buildDeployArtifact,
     dist <<= buildDeployArtifact,
 
     mergeStrategy in assembly <<= (mergeStrategy in assembly) { current =>
@@ -50,32 +63,46 @@ object Frontend extends Plugin {
         case "version.txt" => MergeStrategy.last
 
         case "overview.html" => MergeStrategy.first
+        case "NOTICE" => MergeStrategy.first
+        case "LICENSE" => MergeStrategy.first
         case meta if meta.startsWith("META-INF/") => MergeStrategy.first
 
         case other => current(other)
       }
-    }
+    },
+
+    excludedFiles in assembly := { (bases: Seq[File]) =>
+    bases flatMap { base =>
+      (base / "META-INF" * "*").get collect {
+        case f if f.getName.toLowerCase == "license" => f
+        case f if f.getName.toLowerCase == "manifest.mf" => f
+        case f if f.getName.endsWith(".SF") => f
+        case f if f.getName.endsWith(".DSA") => f
+        case f if f.getName.endsWith(".RSA") => f
+      }
+    }}
   )
 
-  val cssGenerator = TaskKey[Seq[File]]("css-generator", "Copy CSS files to resources-managed")
+  lazy val assetHashSettings = Seq(
+    resourceGenerators in Compile <+= cssGeneratorTask,
+    resourceGenerators in Compile <+= imageGeneratorTask,
+    managedResources in Compile <<= managedResourcesWithMD5s,
+    artifactResources <++= assetMapResources
+  )
+
+
   val cssGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
-    (sourceDirectory, resourceManaged) =>
-      val css = (sourceDirectory / "assets") ** "*.css"
-      val copies = css.get map { css => (css, resourceManaged / "public" / css.rebase(sourceDirectory / "assets").toString) }
-
-      IO.copy(copies)
-
-      copies.unzip._2
+    (sourceDir, resourceManaged) => generatorTransform(sourceDir,resourceManaged,(sourceDir / "assets") ** "*.css")
   }
 
-  val imageGenerator = TaskKey[Seq[File]]("image-generator", "Copy image files to resources-managed")
   val imageGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
-    (sourceDirectory, resourceManaged) =>
-      val images = (sourceDirectory / "assets" / "images") ** "*"
-      val copies = images.get map { image => (image, resourceManaged / "public" / image.rebase(sourceDirectory / "assets").toString) }
+    (sourceDirectory, resourceManaged) => generatorTransform(sourceDirectory, resourceManaged, (sourceDirectory / "assets" / "images") ** "*")
+  }
 
+  val generatorTransform = {
+    (sourceDirectory:File, resourceManaged:File, assetFinder:PathFinder) =>
+      val copies = assetFinder.get map { asset => (asset, resourceManaged / "public" / asset.rebase(sourceDirectory / "assets").toString) }
       IO.copy(copies)
-
       copies.unzip._2
   }
 
@@ -109,42 +136,41 @@ object Frontend extends Plugin {
         assetMapFile +: (current updateWith assetRemappings).toSeq
     }
 
+  private def assetMapResources =
+    (streams, assembly, target, name) map {
+      (s, assembly, target, projectName) =>
+        val targetDist = target / "dist"
+        if (targetDist exists) { targetDist.delete }
+
+        // Extract and identify assets
+        IO.unzip(assembly, targetDist, new SimpleFilter(name =>
+          name.startsWith("assetmaps") || name.startsWith("public"))
+        )
+
+        val assetMaps = (targetDist / "assetmaps" * "*").get map { loadAssetMap(_) }
+
+        // You try to determine a precedence order here if you like...
+        val keyCollisions = assetMaps.toList.duplicateKeys
+        if (!keyCollisions.isEmpty) {
+          throw new RuntimeException("Assetmap collisions for: " + keyCollisions.toList.sorted.mkString(", "))
+        }
+
+        val staticFiles = assetMaps flatMap { _.values } map { file =>
+          (targetDist / "public" / file, "packages/%s/static-files/%s".format(projectName, file))
+        }
+
+        staticFiles
+    }
+
   private def buildDeployArtifact =
-    (streams, assembly, baseDirectory, target, name, playCopyAssets, classDirectory in Compile) map {
-      (s, assembly, baseDirectory, target, projectName, playCopyAssets, classDirectory) =>
+    (streams, assembly, target, artifactResources, artifactFile) map {
+      (s, assembly, target, resources, artifactFileName) =>
         {
-          val distFile = target / "artifacts.zip"
+          val distFile = target / artifactFileName
           s.log.info("Disting " + distFile)
 
           if (distFile exists) { distFile.delete }
-
-          val targetDist = target / "dist"
-          if (targetDist exists) { targetDist.delete }
-
-          // Extract and identify assets
-          IO.unzip(assembly, targetDist, new SimpleFilter(name =>
-            name.startsWith("assetmaps") || name.startsWith("public"))
-          )
-
-          val assetMaps = (targetDist / "assetmaps" * "*").get map { loadAssetMap(_) }
-
-          // You try to determine a precedence order here if you like...
-          val keyCollisions = assetMaps.toList.duplicateKeys
-          if (!keyCollisions.isEmpty) {
-            throw new RuntimeException("Assetmap collisions for: " + keyCollisions.toList.sorted.mkString(", "))
-          }
-
-          val staticFiles = assetMaps flatMap { _.values } map { file =>
-            (targetDist / "public" / file, "packages/%s/static-files/%s".format(projectName, file))
-          }
-
-          // Build artifact
-          val assemblyFiles = Seq(
-            baseDirectory / "conf" / "deploy.json" -> "deploy.json",
-            assembly -> "packages/%s/%s".format(projectName, assembly.getName)
-          ) ++ staticFiles
-
-          IO.zip(assemblyFiles, distFile)
+          IO.zip(resources, distFile)
 
           // Tells TeamCity to publish the artifact => leave this println in here
           println("##teamcity[publishArtifacts '%s => .']" format distFile)
