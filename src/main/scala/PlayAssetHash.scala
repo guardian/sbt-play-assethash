@@ -12,15 +12,21 @@ import PlayArtifact._
 
 object PlayAssetHash extends Plugin {
 
-  lazy val playAssetHashCompileSettings: Seq[Setting[_]] = playArtifactCompileSettings ++ Seq(
+  lazy val playAssetHashCompileSettings: Seq[Setting[_]] = playArtifactCompileSettings ++ compileSettings
+
+  lazy val playAssetHashDistSettings: Seq[Setting[_]] = playArtifactDistSettings ++ distSettings
+
+
+  lazy val compileSettings: Seq[Setting[_]] = Seq(
     resourceGenerators in Compile <+= cssGeneratorTask,
     resourceGenerators in Compile <+= imageGeneratorTask,
     managedResources in Compile <<= managedResourcesWithMD5s
   )
 
-  lazy val playAssetHashDistSettings: Seq[Setting[_]] = playAssetHashCompileSettings ++ Seq(
+  lazy val distSettings: Seq[Setting[_]] = compileSettings ++ Seq(
     playArtifactResources <++= assetMapResources
   )
+
 
   val cssGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
     (sourceDir, resourceManaged) => generatorTransform(sourceDir, resourceManaged, (sourceDir / "assets") ** "*.css")
