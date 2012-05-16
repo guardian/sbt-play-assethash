@@ -80,7 +80,7 @@ object PlayAssetHash extends Plugin {
 
       val assetMaps = (targetDist / "assetmaps" * "*").get map { loadProperties(_) }
 
-      // You try to determine a precedence order here if you like...
+      // You determine a precedence order here if you like...
       val keyCollisions = assetMaps.toList.duplicateKeys
       if (!keyCollisions.isEmpty) {
         throw new RuntimeException("Assetmap collisions for: " + keyCollisions.toList.sorted.mkString(", "))
