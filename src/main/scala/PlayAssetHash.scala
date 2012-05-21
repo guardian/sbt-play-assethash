@@ -6,6 +6,7 @@ import sbt._
 import sbt.Keys._
 import sbtassembly.Plugin.AssemblyKeys._
 
+
 object PlayAssetHash extends Plugin {
 
   lazy val playAssetHashCompileSettings: Seq[Setting[_]] = playArtifactCompileSettings ++ compileSettings
@@ -66,7 +67,7 @@ object PlayAssetHash extends Plugin {
       assetMapFile +: (current updateWith assetRemappings).toSeq
   }
 
-  private def assetMapResources = (assembly, target, name) map {
+  private def assetMapResources = (assembly, target, executableName) map {
     (assembly, target, projectName) =>
       val targetDist = target / "dist"
       if (targetDist exists) {
