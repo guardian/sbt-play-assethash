@@ -10,6 +10,9 @@ object PluginBuild extends Build {
 
   val playArtifactPluginVersion = "1.5"
 
+  lazy val playSnapshots = Resolver.url("Play 2.1-SNAPSHOT",
+    url("http://guardian.github.com/ivy/repo-snapshots"))(Resolver.ivyStylePatterns)
+
   lazy val main = Project("sbt-play-assethash", file("."))
     // Fixed in SBT 0.12: https://github.com/harrah/xsbt/issues/329
     //.settings(ScalariformPlugin.scalariformSettings: _*)
@@ -18,10 +21,7 @@ object PluginBuild extends Build {
       organization := "com.gu",
       sbtPlugin := true,
 
-      resolvers ++= Seq(
-        "sbt-idea-repo" at "http://mpeltonen.github.com/maven/",
-        "mvn repository" at "http://mvnrepository.com/artifact/"
-      )
+      resolvers += playSnapshots
     )
     .dependsOn(uri("git://github.com/guardian/sbt-play-artifact.git#" + playArtifactPluginVersion))
 }

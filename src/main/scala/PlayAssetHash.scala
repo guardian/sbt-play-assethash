@@ -9,16 +9,13 @@ import sbtassembly.Plugin.AssemblyKeys._
 
 object PlayAssetHash extends Plugin {
 
-  lazy val playAssetHashCompileSettings: Seq[Setting[_]] = playArtifactCompileSettings ++ compileSettings
-  lazy val playAssetHashDistSettings: Seq[Setting[_]] = playArtifactDistSettings ++ distSettings
-
-  lazy val compileSettings: Seq[Setting[_]] = Seq(
+  lazy val playAssetHashCompileSettings: Seq[Setting[_]] = Seq(
     resourceGenerators in Compile <+= cssGeneratorTask,
     resourceGenerators in Compile <+= imageGeneratorTask,
     managedResources in Compile <<= managedResourcesWithMD5s
   )
 
-  lazy val distSettings: Seq[Setting[_]] = compileSettings ++ Seq(
+  lazy val playAssetHashDistSettings: Seq[Setting[_]] = playArtifactDistSettings ++ playAssetHashCompileSettings ++ Seq(
     playArtifactResources <++= assetMapResources
   )
 
