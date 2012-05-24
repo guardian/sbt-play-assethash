@@ -9,6 +9,11 @@ import sbtassembly.Plugin.AssemblyKeys._
 
 object PlayAssetHash extends Plugin {
 
+  lazy val staticFilesPackage: SettingKey[String] =
+    SettingKey("static-files-package", "Package to deploy static files to when building artifact")
+
+  staticFilesPackage := "static-files"
+
   lazy val playAssetHashCompileSettings: Seq[Setting[_]] = Seq(
     resourceGenerators in Compile <+= cssGeneratorTask,
     resourceGenerators in Compile <+= imageGeneratorTask,
@@ -64,8 +69,8 @@ object PlayAssetHash extends Plugin {
       assetMapFile +: (current updateWith assetRemappings).toSeq
   }
 
-  private def assetMapResources = (assembly, target, executableName) map {
-    (assembly, target, projectName) =>
+  private def assetMapResources = (assembly, target, staticFilesPackage) map {
+    (assembly, target, staticDir) =>
       val targetDist = target / "dist"
       if (targetDist exists) {
         targetDist.delete
@@ -85,7 +90,7 @@ object PlayAssetHash extends Plugin {
       }
 
       val staticFiles = assetMaps flatMap { _.values } map { file =>
-        (targetDist / "public" / file, "packages/%s/static-files/%s".format(projectName, file))
+        (targetDist / "public" / file, "packages/%s/%s".format(staticDir, file))
       }
 
       staticFiles

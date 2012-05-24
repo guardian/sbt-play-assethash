@@ -8,7 +8,7 @@ object PluginBuild extends Build {
   // they are dependencies of the plugin itself and not associated with the 
   // build definition as plugins usually are.
 
-  val playArtifactPluginVersion = "1.6"
+  val playArtifactPluginVersion = "1.8"
 
   lazy val playSnapshots = Resolver.url("Play 2.1-SNAPSHOT",
     url("http://guardian.github.com/ivy/repo-snapshots"))(Resolver.ivyStylePatterns)
