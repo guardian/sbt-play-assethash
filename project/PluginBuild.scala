@@ -8,10 +8,7 @@ object PluginBuild extends Build {
   // they are dependencies of the plugin itself and not associated with the 
   // build definition as plugins usually are.
 
-  val playArtifactPluginVersion = "1.6"
-
-  lazy val playSnapshots = Resolver.url("Play 2.1-SNAPSHOT",
-    url("http://guardian.github.com/ivy/repo-snapshots"))(Resolver.ivyStylePatterns)
+  val playArtifactPluginVersion = "1.7"
 
   lazy val main = Project("sbt-play-assethash", file("."))
     // Fixed in SBT 0.12: https://github.com/harrah/xsbt/issues/329
@@ -19,9 +16,7 @@ object PluginBuild extends Build {
     .settings(
       name := "sbt-play-assethash",
       organization := "com.gu",
-      sbtPlugin := true,
-
-      resolvers += playSnapshots
+      sbtPlugin := true
     )
     .dependsOn(uri("git://github.com/guardian/sbt-play-artifact.git#" + playArtifactPluginVersion))
 }
