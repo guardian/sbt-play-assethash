@@ -15,29 +15,50 @@ object PlayAssetHash extends Plugin {
   staticFilesPackage := "static-files"
 
   lazy val playAssetHashCompileSettings: Seq[Setting[_]] = Seq(
-    resourceGenerators in Compile <+= cssGeneratorTask,
-    resourceGenerators in Compile <+= imageGeneratorTask,
+    resourceGenerators in Compile <+= resourceGeneratorTask,
     managedResources in Compile <<= managedResourcesWithMD5s
   )
 
   lazy val playAssetHashDistSettings: Seq[Setting[_]] = playArtifactDistSettings ++ playAssetHashCompileSettings ++ Seq(
-    playArtifactResources <++= assetMapResources
+    playArtifactResources <++= assetMapResources,
+    assetRoots <<= (sourceDirectory in Compile) { sourceDirectory =>
+      Seq(
+        (sourceDirectory / "assets"),
+        (sourceDirectory / "public")
+      )
+    },
+    assetsToHash <<= (sourceDirectory in Compile) { sourceDirectory =>
+      Seq(
+        (sourceDirectory / "assets") ** "*.css",
+        (sourceDirectory / "assets" / "images") ** "*",
+        (sourceDirectory / "public") ** "*"
+      )
+    }
   )
 
-  val cssGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
-    (sourceDirectory, resourceManaged) => generatorTransform(sourceDirectory, resourceManaged, (sourceDirectory / "assets") ** "*.css")
+  lazy val assetRoots: SettingKey[Seq[File]] =
+    SettingKey("asset-roots", "Root directories of assets")
+
+  lazy val assetsToHash: SettingKey[Seq[PathFinder]] =
+    SettingKey("assets-to-hash", "Extra assets to be hashed")
+
+  val resourceGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile, assetsToHash, assetRoots) map {
+    (sourceDirectory, resourceManaged, files, roots) => {
+      files.flatMap{ generatorTransform(sourceDirectory, resourceManaged, _, roots) }
+    }
   }
 
-  val imageGeneratorTask = (sourceDirectory in Compile, resourceManaged in Compile) map {
-    (sourceDirectory, resourceManaged) => generatorTransform(sourceDirectory, resourceManaged, (sourceDirectory / "assets" / "images") ** "*")
-  }
-
-  def generatorTransform(sourceDirectory: File, resourceManaged: File, assetFinder: PathFinder) = {
-      val copies = assetFinder.get map {
-        asset => (asset, resourceManaged / "public" / asset.rebase(sourceDirectory / "assets").toString)
+  def generatorTransform(sourceDirectory: File, resourceManaged: File, assetFinder: PathFinder, assetRoots: Seq[File]) = {
+    val copies = assetFinder.get.filterNot(_.isDirectory) map {
+      asset => {
+        val root = assetRoots.find(asset.isRebaseableTo).getOrElse(
+          sys.error("file " + asset + " does not fall under one of the roots " + assetRoots)
+        )
+        (asset, resourceManaged / "public" / asset.rebase(root).toString)
       }
-      IO.copy(copies)
-      copies.unzip._2
+    }
+    IO.copy(copies)
+    copies.unzip._2
   }
 
   private def managedResourcesWithMD5s = (streams in Compile, managedResources in Compile, resourceManaged in Compile) map {
