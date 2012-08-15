@@ -65,7 +65,8 @@ object PlayAssetHash extends Plugin {
     (streams, current, resourceManaged) =>
       implicit val log = streams.log
 
-      val assetFiles = current filter { _.isUnder(resourceManaged / "public") }
+      val assetFiles = current filter { _.isUnder(resourceManaged / "public") } filter { _.exists() }
+
       val assets = Assets.fromFiles(resourceManaged / "public", assetFiles)
 
       val assetRemappings = assets.toMD5Remap
