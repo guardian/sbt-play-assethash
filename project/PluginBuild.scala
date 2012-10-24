@@ -8,7 +8,7 @@ object PluginBuild extends Build {
   // they are dependencies of the plugin itself and not associated with the 
   // build definition as plugins usually are.
 
-  val playArtifactPluginVersion = "1.8"
+  val playArtifactPluginVersion = "2.1"
 
   lazy val main = Project("sbt-play-assethash", file("."))
     // Fixed in SBT 0.12: https://github.com/harrah/xsbt/issues/329
