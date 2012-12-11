@@ -1,7 +1,6 @@
 package com.gu.deploy
 
 import com.gu.deploy.PlayArtifact._
-import java.io.File
 import sbt._
 import sbt.Keys._
 import sbtassembly.Plugin.AssemblyKeys._
@@ -94,8 +93,8 @@ object PlayAssetHash extends Plugin {
   private def assetMapResources = (assembly, target, staticFilesPackage) map {
     (assembly, target, staticDir) =>
       val targetDist = target / "dist"
-      if (targetDist exists) {
-        targetDist.delete
+      if (targetDist.exists()) {
+        targetDist.delete()
       }
 
       // Extract and identify assets

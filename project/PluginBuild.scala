@@ -1,4 +1,3 @@
-import com.typesafe.sbtscalariform.ScalariformPlugin
 import sbt._
 import sbt.Keys._
 
@@ -8,11 +7,11 @@ object PluginBuild extends Build {
   // they are dependencies of the plugin itself and not associated with the 
   // build definition as plugins usually are.
 
-  val playArtifactPluginVersion = "2.1"
+  val playArtifactPluginVersion = "2.4"
 
   lazy val main = Project("sbt-play-assethash", file("."))
     // Fixed in SBT 0.12: https://github.com/harrah/xsbt/issues/329
-    //.settings(ScalariformPlugin.scalariformSettings: _*)
+    //.settings(com.typesafe.sbtscalariform.ScalariformPlugin.scalariformSettings: _*)
     .settings(
       name := "sbt-play-assethash",
       organization := "com.gu",

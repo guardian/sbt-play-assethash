@@ -1,6 +1,5 @@
 package com.gu.deploy
 
-import java.io.File
 import sbt._
 
 class Assets(private val assets: Seq[Asset]) {
