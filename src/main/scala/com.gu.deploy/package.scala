@@ -6,6 +6,9 @@ import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.IOUtils
 import sbt._
 import scala.collection.JavaConversions._
+import com.google.common.io.Files
+import java.security.MessageDigest
+import org.apache.commons.codec.binary.Hex
 
 object `package` {
 
@@ -15,10 +18,6 @@ object `package` {
     } finally {
       closable.close()
     }
-  }
-
-  implicit def string2Md5Hex(s: String) = new {
-    lazy val md5Hex: String = DigestUtils md5Hex s
   }
 
   implicit def string2IndentContinuationLines(s: String) = new {
@@ -40,8 +39,11 @@ object `package` {
   }
 
   implicit def file2Md5Hex(file: File) = new {
-    def contents: String = using(new FileInputStream(file)) { IOUtils toString _ }
-    def md5Hex = contents.md5Hex
+    def md5Hex = new String(Hex.encodeHex(Files.getDigest(file, MessageDigest.getInstance("MD5"))))
+  }
+
+  implicit def string2Md5Hex(s: String) = new {
+    def md5Hex = DigestUtils.md5Hex(s)
   }
 
   implicit def seq2UpdateWith[V](seq: Seq[V]) = new {
