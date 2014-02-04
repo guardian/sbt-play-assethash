@@ -35,7 +35,7 @@ The dist settings include the compile settings - the only time you might want to
 common library (such as [frontend-common](https://github.com/guardian/frontend-common).
 
 ```scala
-import com.gu.PlayAssetHash._
+import com.gu.deploy.PlayAssetHash._
 
   val main = PlayProject(appName, appVersion, appDependencies, mainLang = SCALA)
     .settings(playAssetHashDistSettings: _*)
